@@ -4,21 +4,19 @@ from core.vinloader import VideoLoader
 from core.epicdetector import EpicDetector
 from checker.aechecker import AestheticChecker
 
-import cv2
-
 video_path = "input/g1.mp4"
 
 loader = VideoLoader(video_path)
 audio = AudioAnalyzer(video_path)
 
 detector = EpicDetector(loader, audio)
-epic_frames = detector.detect()
+clips = detector.detect()
 
 checker = AestheticChecker(loader)
-final_frames = checker.review(epic_frames)
+approved_clips = checker.review(clips)
 
-fps = loader.cap.get(cv2.CAP_PROP_FPS)
 loader.release()
 
 exporter = ClipExporter(video_path)
-exporter.export(final_frames, fps)
+exporter.export(approved_clips, output_path="output/epic_clips.mp4")
+exporter.close()

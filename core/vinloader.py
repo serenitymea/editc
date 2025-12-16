@@ -4,23 +4,34 @@ class VideoLoader:
     def __init__(self, path):
         self.cap = cv2.VideoCapture(path)
         if not self.cap.isOpened():
-            raise IOError("op error")
+            raise IOError("Video open error")
 
-    def frames(self):
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        while True:
-            ret, f = self.cap.read()
-            if not ret or f is None:
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    def frames(self, start=0, end=None):
+        if end is None:
+            end = self.frame_count
+
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        i = start
+
+        while i < end:
+            ret, frame = self.cap.read()
+            if not ret:
                 break
-            yield f
-            
-    def get_frames(self, frame_id):
+            yield i, frame
+            i += 1
+
+    def get_frame(self, frame_id):
+        if frame_id < 0 or frame_id >= self.frame_count:
+            return None
+
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
         ret, frame = self.cap.read()
-        if not ret:
-            return None
-        return frame
+        return frame if ret else None
 
     def release(self):
         self.cap.release()
-        

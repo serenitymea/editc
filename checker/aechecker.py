@@ -4,51 +4,40 @@ class AestheticChecker:
     def __init__(self, loader):
         self.loader = loader
 
-    def group_consecutive(self, frames):
-        groups = []
-        current = []
-
-        for f in frames:
-            if not current or f == current[-1] + 1:
-                current.append(f)
-            else:
-                groups.append(current)
-                current = [f]
-
-        if current:
-            groups.append(current)
-
-        return groups
-
-    def preview_chunk(self, chunk, delay=40):
-        for frame_id in chunk:
-            frame = self.loader.get_frames(frame_id)
-            if frame is None:
-                continue
-
+    def preview_clip(self, clip, delay=40):
+        for i, frame in self.loader.frames(clip.start_frame, clip.end_frame + 1):
             cv2.imshow("Aesthetic Checker", frame)
-
             key = cv2.waitKey(delay) & 0xFF
             if key == ord('q'):
+                return False
+        return True
+
+    def review(self, clips):
+        approved = []
+
+        for clip in clips:
+            shown = self.preview_clip(clip)
+
+            if not shown:
                 break
 
-    def review(self, frames):
-        approved = []
-        chunks = self.group_consecutive(frames)
-
-        for chunk in chunks:
-            self.preview_chunk(chunk)
-
-            print(f"\nkadry {chunk[0]}–{chunk[-1]}")
-            print("Y | N")
+            print(
+                f"\nClip {clip.start_frame}-{clip.end_frame} "
+                f"({clip.start_time:.2f}s – {clip.end_time:.2f}s, "
+                f"{clip.duration:.2f}s, score={clip.score:.2f})"
+            )
+            print("Y | N | F")
 
             while True:
-                key = cv2.waitKey(0)
+                key = cv2.waitKey(0) & 0xFF
                 if key == ord('y'):
-                    approved.extend(chunk)
+                    approved.append(clip)
                     break
-                elif key == ord('n'):
+                if key == ord('n'):
                     break
+                if key == ord('f'):
+                    cv2.destroyAllWindows()
+                    return approved
 
         cv2.destroyAllWindows()
         return approved
