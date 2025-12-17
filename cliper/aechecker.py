@@ -41,3 +41,4 @@ class AestheticChecker:
 
         cv2.destroyAllWindows()
         return approved
+        

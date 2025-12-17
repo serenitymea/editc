@@ -1,22 +1,17 @@
-from core.audioanalyzer import AudioAnalyzer
-from core.clipexporter import ClipExporter
-from core.vinloader import VideoLoader
-from core.epicdetector import EpicDetector
-from checker.aechecker import AestheticChecker
+from editor import VideoPipeline
 
-video_path = "input/g1.mp4"
+def main():
+    
+    vp = VideoPipeline(
+        input_video="input/g1.mp4",
+        output_video="output/final.mp4",
+        music_file="input/m1.mp3",
+        bpm=120,
+        beats_per_clip=16
+    )
 
-loader = VideoLoader(video_path)
-audio = AudioAnalyzer(video_path)
+    vp.run()
+    print("end")
 
-detector = EpicDetector(loader, audio)
-clips = detector.detect()
-
-checker = AestheticChecker(loader)
-approved_clips = checker.review(clips)
-
-loader.release()
-
-exporter = ClipExporter(video_path)
-exporter.export(approved_clips, output_path="output/epic_clips.mp4")
-exporter.close()
+if __name__ == "__main__":
+    main()
