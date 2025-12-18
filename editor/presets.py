@@ -6,9 +6,9 @@ class VideoEffects:
         self.height = 720
 
     def get_preset(self, score):
-        if score >= 18:
+        if score >= 1000:
             return self.impact
-        if score >= 13:
+        if score >= 500:
             return self.beat_zoom
         return self.clean_cut
     
@@ -40,8 +40,8 @@ class VideoEffects:
         setpts=PTS-STARTPTS,
         setpts=PTS/{self.speed},
         crop=iw-20:ih-20:
-        x='10*sin(2*PI*t*25)':
-        y='10*cos(2*PI*t*25)',
+        x='4*sin(2*PI*t*25)':
+        y='4*cos(2*PI*t*25)',
         scale={self.width}:{self.height},
         setsar=1,
         format=yuv420p[v{i}]

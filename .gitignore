@@ -13,3 +13,5 @@ env/
 output/*
 input/*
 tmp/*
+tests/*
+testresults/*

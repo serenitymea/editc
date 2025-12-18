@@ -25,7 +25,7 @@ class VideoRenderer:
         bpm: float,
         beats_per_clip: int,
         music_file: str,
-        resolution: str = "1080:1920",
+        resolution: str = "1280:720",
         fps: int = 30,
     ):
         self.input_video = input_video

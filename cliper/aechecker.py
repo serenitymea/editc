@@ -31,11 +31,14 @@ class AestheticChecker:
             while True:
                 key = cv2.waitKey(0) & 0xFF
                 if key == ord('y'):
+                    print('Y')
                     approved.append(clip)
                     break
                 if key == ord('n'):
+                    print('N')
                     break
                 if key == ord('f'):
+                    print('F')
                     cv2.destroyAllWindows()
                     return approved
 
