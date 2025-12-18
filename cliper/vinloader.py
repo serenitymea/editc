@@ -1,37 +1,55 @@
 import cv2
+from typing import Generator, Tuple, Optional
+
 
 class VideoLoader:
-    def __init__(self, path):
+    def __init__(self, path: str):
+        self.path = path
         self.cap = cv2.VideoCapture(path)
+
         if not self.cap.isOpened():
-            raise IOError("Video open error")
+            raise IOError(f"c't open vid: {path}")
 
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.fps: float = self._get(cv2.CAP_PROP_FPS)
+        self.frame_count: int = int(self._get(cv2.CAP_PROP_FRAME_COUNT))
+        self.width: int = int(self._get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.height: int = int(self._get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.duration: float = self.frame_count / self.fps if self.fps else 0.0
 
-    def frames(self, start=0, end=None):
-        if end is None:
+    def _get(self, prop: int) -> float:
+        value = self.cap.get(prop)
+        if value <= 0:
+            raise ValueError(f"invalid vid p: {prop}")
+        return value
+
+    def frames(
+        self,
+        start: int = 0,
+        end: Optional[int] = None
+    ) -> Generator[Tuple[int, any], None, None]:
+        if start < 0:
+            start = 0
+
+        if end is None or end > self.frame_count:
             end = self.frame_count
 
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        i = start
+        if start >= end:
+            return
 
-        while i < end:
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+
+        for index in range(start, end):
             ret, frame = self.cap.read()
             if not ret:
                 break
-            yield i, frame
-            i += 1
+            yield index, frame
 
-    def get_frame(self, frame_id):
-        if frame_id < 0 or frame_id >= self.frame_count:
-            return None
+    def release(self) -> None:
+        if self.cap:
+            self.cap.release()
 
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-        ret, frame = self.cap.read()
-        return frame if ret else None
+    def __enter__(self):
+        return self
 
-    def release(self):
-        self.cap.release()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()

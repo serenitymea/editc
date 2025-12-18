@@ -1,4 +1,3 @@
-from .aechecker import AestheticChecker
 from .audioanalyzer import AudioAnalyzer
 from .clipexporter import ClipExporter
 from .epicdetector import EpicDetector

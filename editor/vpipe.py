@@ -8,7 +8,10 @@ class VideoPipeline:
         self.output_video = output_video
         self.bpm = bpm
         self.beats_per_clip = beats_per_clip
-        self.pipeline = ClipP(input_video)
+        self.pipeline = ClipP(
+        video_path="input/g1.mp4",
+        music_path="input/m1.mp3"
+        )
         self.music_file = music_file
         
         self.render = VideoRenderer(
