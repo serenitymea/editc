@@ -2,8 +2,8 @@ class VideoEffects:
     def __init__(self, clip, speed):
         self.clip = clip
         self.speed = speed
-        self.width = 1280
-        self.height = 720
+        self.width = 1920
+        self.height = 1200
 
     def get_preset(self, score):
         if score >= 1000:
