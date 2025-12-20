@@ -1,7 +1,7 @@
 from editor import VideoPipeline
 
 def main():
-    
+        
     vp = VideoPipeline(
         input_video="input/g1.mp4",
         output_video="output/final.mp4",

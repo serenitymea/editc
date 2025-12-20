@@ -1,8 +1,11 @@
 import cv2
 import numpy as np
 from dataclasses import dataclass
+from scipy.ndimage import gaussian_filter1d
+from typing import List, Optional
 
-@dataclass
+
+@dataclass(frozen=True)
 class Clip:
     start_frame: int
     end_frame: int
@@ -10,19 +13,23 @@ class Clip:
     score: float
 
     @property
-    def start_time(self):
+    def start_time(self) -> float:
         return self.start_frame / self.fps
 
     @property
-    def end_time(self):
+    def end_time(self) -> float:
         return self.end_frame / self.fps
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         return self.end_time - self.start_time
 
 
 class EpicDetector:
+    MOTION_WEIGHT = 0.6
+    AUDIO_WEIGHT = 0.4
+    AUDIO_GAIN = 40
+    SMOOTH_SIGMA = 3
 
     def __init__(self, loader, audio_analyzer):
         self.loader = loader
@@ -35,100 +42,89 @@ class EpicDetector:
 
     def detect_for_edit(
         self,
-        target_duration: float = 15.0,
         clip_duration: float = 0.5,
-        motion_thresh: float = 30,
-        keep_top_percent: int = 80,
-    ):
+        target_duration: Optional[float] = None,
+    ) -> List[Clip]:
 
-        beat_times = self.audio.beat_times()
-        peak_times = self.audio.peak_times()
-
-        sync_points = self._prepare_sync_points(
-            beat_times, peak_times, target_duration
-        )
-
-        scores = self._analyze_video(motion_thresh)
+        sync_points = self._get_sync_points()
+        scores = self._compute_scores()
         clip_frames = int(clip_duration * self.fps)
 
-        clips = [
-            clip
-            for t in sync_points
-            if (clip := self._find_best_clip(t, clip_frames, scores))
-        ]
+        selected: List[Clip] = []
+        total_duration = 0.0
 
-        return self._filter_clips(clips, keep_top_percent)
+        for beat_time in sync_points:
+            if target_duration is not None and total_duration >= target_duration:
+                break
 
-    def _prepare_sync_points(self, beats, peaks, duration):
-        points = np.concatenate([beats, peaks])
-        points = points[points < duration]
-        return np.unique(np.round(points, 2))
+            clip = self._find_best_clip_at_beat(beat_time, clip_frames, scores)
+            if clip and not self._overlaps(clip, selected):
+                selected.append(clip)
+                total_duration += clip.duration
 
-    def _analyze_video(self, motion_thresh):
+        return sorted(selected, key=lambda c: c.start_time)
+
+    def _get_sync_points(self) -> np.ndarray:
+        beats = self.audio.beat_times()
+        peaks = self.audio.peak_times()
+        points = np.unique(np.concatenate([beats, peaks]))
+        return points[points < self.duration]
+
+    def _compute_scores(self) -> np.ndarray:
         scores = np.zeros(self.frames_count, dtype=np.float32)
-        prev_gray = None
+        audio_energy = np.array([
+            self.audio.audio_energy(i, self.frames_count)
+            for i in range(self.frames_count)
+        ])
 
+        prev_gray = None
         for i, frame in self.loader.frames():
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
             if prev_gray is not None:
                 motion = cv2.absdiff(prev_gray, gray).mean()
-                audio_energy = self.audio.audio_energy(i, self.frames_count)
-
                 scores[i] = (
-                    motion * 0.6 +
-                    audio_energy * 40 * 0.4
+                    motion * self.MOTION_WEIGHT +
+                    audio_energy[i] * self.AUDIO_GAIN * self.AUDIO_WEIGHT
                 )
-
             prev_gray = gray
 
-        from scipy.ndimage import gaussian_filter1d
-        return gaussian_filter1d(scores, sigma=3)
+        return gaussian_filter1d(scores, sigma=self.SMOOTH_SIGMA)
 
-    def _find_best_clip(self, target_time, clip_frames, scores):
-        search_window_sec = 2.0
+    def _find_best_clip_at_beat(
+        self,
+        beat_time: float,
+        clip_frames: int,
+        scores: np.ndarray,
+        search_forward_sec: float = 1.0
+    ) -> Optional[Clip]:
 
-        target_frame = int(target_time * self.fps)
-        window = int(search_window_sec * self.fps)
-
-        start = max(0, target_frame - window)
+        target_frame = int(beat_time * self.fps)
+        window = int(search_forward_sec * self.fps)
+        start = target_frame
         end = min(self.frames_count - clip_frames, target_frame + window)
 
         if start >= end:
             return None
 
+        best_start = start
         best_score = -np.inf
-        best_start = None
 
         for s in range(start, end):
-            segment = scores[s : s + clip_frames]
-            segment_score = segment.mean()
-
-            time_offset = abs(s - target_frame) / self.fps
-            proximity = max(0.0, 1.0 - time_offset / search_window_sec)
-
-            score = segment_score * (0.7 + 0.3 * proximity)
-
-            if score > best_score:
-                best_score = score
+            segment_score = scores[s:s + clip_frames].mean()
+            if segment_score > best_score:
+                best_score = segment_score
                 best_start = s
-
-        if best_start is None:
-            return None
 
         return Clip(
             start_frame=best_start,
             end_frame=best_start + clip_frames - 1,
             fps=self.fps,
-            score=best_score,
+            score=best_score
         )
 
-    def _filter_clips(self, clips, keep_top_percent):
-        if not clips:
-            return []
-
-        clips = sorted(clips, key=lambda c: c.score, reverse=True)
-        keep = max(1, int(len(clips) * keep_top_percent / 100))
-
-        selected = clips[:keep]
-        return sorted(selected, key=lambda c: c.start_time)
+    @staticmethod
+    def _overlaps(clip: Clip, clips: List[Clip]) -> bool:
+        return any(
+            not (clip.end_frame < c.start_frame or clip.start_frame > c.end_frame)
+            for c in clips
+        )
