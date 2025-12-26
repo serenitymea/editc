@@ -2,43 +2,52 @@ import os
 import subprocess
 import numpy as np
 import librosa
-from scipy.signal import find_peaks
+from typing import List
 
 
 class AudioAnalyzer:
-    def __init__(self, video_path, external_audio=None):
-        os.makedirs("tmp", exist_ok=True)
-        tmp_audio = "tmp/audio.wav"
 
+    def __init__(self, video_path, music_path):
+        os.makedirs("tmp", exist_ok=True)
+
+        print(" [AA]load m...")
+        self.music_y, self.music_sr = librosa.load(
+            music_path, sr=None, mono=True
+        )
+
+        print("   [AA]anal beats...")
+        self.tempo, beats_frames = librosa.beat.beat_track(
+            y=self.music_y,
+            sr=self.music_sr,
+            units="frames"
+        )
+
+        if isinstance(self.tempo, np.ndarray):
+            self.tempo = float(self.tempo[0])
+
+        self.beat_times = librosa.frames_to_time(
+            beats_frames, sr=self.music_sr
+        )
+
+        tmp_audio = "tmp/video_audio.wav"
         try:
             self._extract_audio_ffmpeg(video_path, tmp_audio)
-
-            self.y, self.sr = librosa.load(tmp_audio, sr=None, mono=True)
-            self.rms = librosa.feature.rms(y=self.y, hop_length=512)[0]
-
-            if external_audio and os.path.exists(external_audio):
-                self.target_y, self.target_sr = librosa.load(
-                    external_audio, sr=None, mono=True
-                )
-            else:
-                self.target_y, self.target_sr = self.y, self.sr
-
-            self.tempo, self.beats = librosa.beat.beat_track(
-                y=self.target_y, sr=self.target_sr
+            self.video_y, self.video_sr = librosa.load(
+                tmp_audio, sr=None, mono=True
             )
-
-            self.peaks = self._find_energy_peaks(
-                self.target_y, self.target_sr
-            )
-
+            self.rms = librosa.feature.rms(
+                y=self.video_y, hop_length=512
+            )[0]
         finally:
             if os.path.exists(tmp_audio):
                 os.remove(tmp_audio)
 
+        print(f"   [AA]temp: {self.tempo:.1f} BPM")
+        print(f"   [AA]f beats: {len(self.beat_times)}")
+
     def _extract_audio_ffmpeg(self, video_path, out_path):
         cmd = [
-            "ffmpeg",
-            "-y",
+            "ffmpeg", "-y",
             "-i", video_path,
             "-vn",
             "-ac", "1",
@@ -46,52 +55,24 @@ class AudioAnalyzer:
             "-f", "wav",
             out_path
         ]
-
         result = subprocess.run(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-
-        if result.returncode != 0 or not os.path.exists(out_path):
+        if result.returncode != 0:
             raise RuntimeError("ffmpeg audio extraction failed")
 
-    def _find_energy_peaks(self, y, sr):
-        hop = 512
+    def get_beat_intervals(self) -> List[tuple]:
 
-        rms = librosa.feature.rms(y=y, hop_length=hop)[0]
+        return [
+            (self.beat_times[i],
+             self.beat_times[i + 1] - self.beat_times[i])
+            for i in range(len(self.beat_times) - 1)
+        ]
 
-        spec = np.abs(librosa.stft(y, hop_length=hop))
-        flux = np.sqrt(np.sum(np.diff(spec, axis=1) ** 2, axis=0))
+    def audio_energy(self, frame_idx, total_frames) -> float:
 
-        onset = librosa.onset.onset_strength(
-            y=y, sr=sr, hop_length=hop
-        )
-
-        length = min(len(rms), len(flux), len(onset))
-        energy = (
-            rms[:length] * 0.4 +
-            flux[:length] * 0.3 +
-            onset[:length] * 0.3
-        )
-
-        peaks, _ = find_peaks(
-            energy,
-            distance=int(sr / hop * 2),
-            prominence=np.percentile(energy, 80)
-        )
-
-        return librosa.frames_to_time(peaks, sr=sr, hop_length=hop)
-
-    def beat_times(self):
-        return librosa.frames_to_time(
-            self.beats, sr=self.target_sr
-        )
-
-    def peak_times(self):
-        return self.peaks
-
-    def audio_energy(self, frame_idx, total_frames):
         if total_frames <= 0 or len(self.rms) == 0:
             return 0.0
 

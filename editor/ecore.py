@@ -1,8 +1,6 @@
 import subprocess
-import os
 from pathlib import Path
 from .presets import VideoEffects
-
 
 MIN_SPEED = 0.6
 MAX_SPEED = 2.2
@@ -24,8 +22,8 @@ class VideoRenderer:
         output_video: str,
         bpm: float,
         beats_per_clip: int,
-        music_file: str,
-        resolution: str = "1280:720",
+        music_file: str = None,
+        resolution: str = "1920:1080",
         fps: int = 30,
     ):
         self.input_video = input_video
@@ -40,34 +38,31 @@ class VideoRenderer:
         input_dir = Path.cwd() / "input"
         if not input_dir.exists():
             raise FileNotFoundError("input directory not found")
-
         for file in input_dir.iterdir():
             if file.suffix.lower() in AUDIO_EXTENSIONS:
                 return str(file)
-
         raise FileNotFoundError("no audio file found in input directory")
 
     def render_edit(self, clips: list):
+        
+        clips = list(clips)
         if not clips:
             raise ValueError("clips list is empty")
 
         filters = []
-        streams = []
+        concat_streams = []
 
         for i, clip in enumerate(clips):
             speed = calc_speed(clip, self.bpm, self.beats_per_clip)
             speed = max(MIN_SPEED, min(MAX_SPEED, speed))
-
             effects = VideoEffects(clip, speed)
-            preset = effects.get_preset(clip.score)
+            preset_fn = effects.get_preset(i)
+            filters.append(preset_fn(i))
+            concat_streams.append(f"[v{i}]")
 
-            filters.append(preset(i))
-            streams.append(f"[v{i}]")
-
-        filter_complex = (
-            ";".join(filters)
-            + f";{''.join(streams)}concat=n={len(streams)}:v=1:a=0[outv]"
-        )
+        filter_complex = ";".join(filters)
+        filter_complex += ";" + "".join(concat_streams)
+        filter_complex += f"concat=n={len(clips)}:v=1:a=0[outv]"
 
         cmd = [
             "ffmpeg", "-y",

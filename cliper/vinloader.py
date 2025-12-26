@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from typing import Generator, Tuple, Optional, Any
+from typing import Generator, Tuple, Optional
 
 
 class VideoLoader:
@@ -21,6 +21,8 @@ class VideoLoader:
             if self.fps > 0 else 0.0
         )
 
+        print(f"[VL] open fps={self.fps} frames={self.frame_count}")
+
     def _get(self, prop: int) -> float:
         value = self.cap.get(prop)
         return float(value) if value > 0 else 0.0
@@ -31,6 +33,12 @@ class VideoLoader:
         end: Optional[int] = None
     ) -> Generator[Tuple[int, np.ndarray], None, None]:
 
+        print(f"[VL] frames start={start} end={end}")
+
+        if self.frame_count <= 0:
+            print("[VL] no frames")
+            return
+
         if start < 0:
             start = 0
 
@@ -38,19 +46,36 @@ class VideoLoader:
             end = self.frame_count
 
         if start >= end:
-            return iter(())
+            print("[VL] empty range")
+            return
 
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
 
-        for index in range(start, end):
+        index = start
+        while index < end:
             ret, frame = self.cap.read()
+
             if not ret:
+                print(f"[VL] read failed at {index}")
                 break
+
+            if frame is None or frame.size == 0:
+                print(f"[VL] bad frame at {index}")
+                break
+
+            if index % 500 == 0:
+                print(f"[VL] frame {index}")
+
             yield index, frame
+            index += 1
+
+        print("[VL] frames done")
 
     def release(self) -> None:
         if self.cap:
+            print("[VL] release")
             self.cap.release()
+            self.cap = None
 
     def __enter__(self):
         return self

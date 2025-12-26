@@ -1,9 +1,8 @@
 import subprocess
-from typing import List
+from typing import List, Optional
 from .vinloader import VideoLoader
 from .audioanalyzer import AudioAnalyzer
-from .epicdetector import EpicDetector, Clip
-
+from .epicdetector import EpicDetector
 
 class ClipP:
 
@@ -12,23 +11,39 @@ class ClipP:
         self.music_path = music_path
 
         self.loader = VideoLoader(video_path)
-        self.audio = AudioAnalyzer(video_path, external_audio=music_path)
+        self.audio = AudioAnalyzer(video_path, music_path)
         self.detector = EpicDetector(self.loader, self.audio)
 
     def run(
         self,
-        clip_duration: float = 0.6,
-        target_duration: float = 30.0,
-    ) -> List[Clip]:
+        target_duration: Optional[float] = None,
+        max_clips: Optional[int] = None,
+    ) -> List:
 
         if target_duration is None:
             target_duration = self._get_audio_duration()
 
+        if max_clips is None and target_duration:
+            beat_intervals = self.audio.get_beat_intervals()
+            cumulative = 0
+            for i, (_, duration) in enumerate(beat_intervals):
+                cumulative += duration
+                if cumulative >= target_duration:
+                    max_clips = i + 1
+                    break
+        
         try:
-            return self.detector.detect_for_edit(
-                target_duration=target_duration,
-                clip_duration=clip_duration,
-            )
+            
+            clips = self.detector.detect_perfect_clips(max_clips=max_clips)
+            
+            print(f"\nf clips: {len(clips)}")
+            if clips:
+                total = sum(c.duration for c in clips)
+                print(f"   len: {total:.2f}s")
+                print(f"   e score: {sum(c.score for c in clips) / len(clips):.3f}")
+            
+            return clips
+            
         finally:
             self.loader.release()
 
