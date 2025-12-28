@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 from .presets import VideoEffects
+from .effectsp import EffectProcessor
 
 MIN_SPEED = 0.6
 MAX_SPEED = 2.2
@@ -25,6 +26,7 @@ class VideoRenderer:
         music_file: str = None,
         resolution: str = "1920:1080",
         fps: int = 30,
+        effect_processor: EffectProcessor = None,
     ):
         self.input_video = input_video
         self.output_video = output_video
@@ -33,6 +35,7 @@ class VideoRenderer:
         self.resolution = resolution
         self.fps = fps
         self.music_file = music_file or self._find_music()
+        self.effect_processor = effect_processor
 
     def _find_music(self) -> str:
         input_dir = Path.cwd() / "input"
@@ -51,13 +54,16 @@ class VideoRenderer:
 
         filters = []
         concat_streams = []
+        total_clips = len(clips)
 
         for i, clip in enumerate(clips):
             speed = calc_speed(clip, self.bpm, self.beats_per_clip)
             speed = max(MIN_SPEED, min(MAX_SPEED, speed))
-            effects = VideoEffects(clip, speed)
-            preset_fn = effects.get_preset(i)
-            filters.append(preset_fn(i))
+
+            effects = VideoEffects(clip, speed, self.effect_processor)
+            preset_fn = effects.get_preset(i, total_clips)
+
+            filters.append(preset_fn(i, total_clips))
             concat_streams.append(f"[v{i}]")
 
         filter_complex = ";".join(filters)
