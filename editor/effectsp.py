@@ -89,6 +89,7 @@ class EffectProcessor:
         
         return effects
     
+    
     def apply_effects(self, base_filter: str, effects: List[str]) -> str:
 
         if not effects:
