@@ -23,7 +23,7 @@ def main():
     
     elif choice == "M":
         merger = VideoMerger()
-        merger.run()
+        merger.run(85)
     
     else:
         print("failed")       
