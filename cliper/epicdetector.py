@@ -78,7 +78,7 @@ class EpicDetector:
             if i >= self.frames_count:
                 break
             
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 print(f" [ED]prog: {i}/{self.frames_count} frames", end='\r')
             
             gray_full = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

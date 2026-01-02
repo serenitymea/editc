@@ -63,9 +63,6 @@ class VideoLoader:
                 print(f"[VL] bad frame at {index}")
                 break
 
-            if index % 500 == 0:
-                print(f"[VL] frame {index}")
-
             yield index, frame
             index += 1
 
