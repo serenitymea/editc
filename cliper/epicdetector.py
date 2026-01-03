@@ -14,16 +14,16 @@ class Clip:
     song_start_time: float
 
     @property
-    def start_time(self) -> float:
+    def start(self) -> float:
         return self.start_frame / self.fps
 
     @property
-    def end_time(self) -> float:
+    def end(self) -> float:
         return self.end_frame / self.fps
 
     @property
     def duration(self) -> float:
-        return self.end_time - self.start_time
+        return self.end - self.start
 
 class EpicDetector:
 
@@ -140,7 +140,7 @@ class EpicDetector:
             
             if best_clip:
                 clips.append(best_clip)
-                print(f"      [ED]beat {i+1}: clip {best_clip.start_time:.2f}s-{best_clip.end_time:.2f}s "
+                print(f"      [ED]beat {i+1}: clip {best_clip.start:.2f}s-{best_clip.end:.2f}s "
                       f"(len: {best_clip.duration:.2f}s, score: {best_clip.score:.3f})")
         
         return clips

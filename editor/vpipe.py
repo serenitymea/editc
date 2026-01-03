@@ -1,5 +1,4 @@
 from .ecore import VideoRenderer
-from .adapter import EditClip
 from .effectsp import EffectProcessor
 from cliper.fin import ClipP
 
@@ -46,9 +45,7 @@ class VideoPipeline:
         
     def run(self):
 
-        raw_clips = self.pipeline.run()
-
-        clips = (EditClip(c) for c in raw_clips)
+        clips = self.pipeline.run()
 
         self.render.render_edit(clips)
 
