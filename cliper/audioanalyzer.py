@@ -15,7 +15,7 @@ class AudioAnalyzer:
             music_path, sr=None, mono=True
         )
 
-        print("   [AA]anal beats...")
+        print("   [AA]a beats...")
         self.tempo, beats_frames = librosa.beat.beat_track(
             y=self.music_y,
             sr=self.music_sr,
@@ -58,7 +58,8 @@ class AudioAnalyzer:
         result = subprocess.run(
             cmd,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            check=True
         )
         if result.returncode != 0:
             raise RuntimeError("ffmpeg audio extraction failed")

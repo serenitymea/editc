@@ -59,6 +59,7 @@ class ClipP:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            check=True
         )
 
         if result.returncode != 0 or not result.stdout.strip():
