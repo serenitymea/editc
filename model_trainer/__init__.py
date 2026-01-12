@@ -1,1 +1,2 @@
-from .app import LabelingController
+from .start_training import LabelingController
+from .cont_training import FineTuneController

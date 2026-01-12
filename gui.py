@@ -10,7 +10,7 @@ import shutil
 from videoeffects import GlitchVideoFX
 from editor import VideoPipeline
 from tools import VideoMerger, LiveFXTester, AddAudio
-from model_trainer import LabelingController
+from model_trainer import LabelingController, FineTuneController
 
 
 class MainWindow(QWidget):
@@ -19,7 +19,9 @@ class MainWindow(QWidget):
         self.setWindowTitle("Video Editor Panel")        
         
         self.labeling_controller: LabelingController | None = None
+        self.tuner: LabelingController | None = None
         self.trainer_window: QMainWindow | None = None
+        self.tester: LiveFXTester | None = None
 
         layout = QVBoxLayout()
 
@@ -121,9 +123,9 @@ class MainWindow(QWidget):
 
     def run_tester(self):
         
-        tester = LiveFXTester()
+        self.tester = LiveFXTester()
 
-        tester.run("input/test1.jpg")
+        self.tester.run("input/test1.jpg")
 
     def run_glitch(self):
         
@@ -200,22 +202,43 @@ class MainWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Merge error", str(e))
             return
-        
-        self.labeling_controller = LabelingController(
-            video_path=str(merged_video_path),
-            music_path=str(audio_path),
-            output_path="model_output"
-        )
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Training mode")
+        msg.setText("choose role")
 
-        self.trainer_window = QMainWindow(self)
-        self.trainer_window.setCentralWidget(
-            self.labeling_controller.widget_view()
-        )
-        self.trainer_window.resize(1280, 720)
-        self.trainer_window.show()
+        restart_btn = msg.addButton("start", QMessageBox.AcceptRole)
+        continue_btn = msg.addButton("continue", QMessageBox.RejectRole)
 
-        self.labeling_controller.start()
-        
+        msg.exec()
+
+        if msg.clickedButton() == restart_btn:
+            self.labeling_controller = LabelingController(
+                video_path=str(merged_video_path),
+                music_path=str(audio_path),
+                output_path="model_output"
+            )
+
+            self.trainer_window = QMainWindow(self)
+            self.trainer_window.setCentralWidget(
+                self.labeling_controller.widget_view()
+            )
+            self.trainer_window.resize(1280, 720)
+            self.trainer_window.show()
+
+            self.labeling_controller.start()
+        elif msg.clickedButton() == continue_btn:
+            self.tuner = FineTuneController(
+                video_path=str(merged_video_path),
+                music_path=str(audio_path),
+                output_path="model_output"
+            )
+            
+            self.trainer_window = QMainWindow(self)
+            self.trainer_window.setCentralWidget(
+                self.labeling_controller.widget_view()
+            )
+            self.trainer_window.resize(1280, 720)
+            self.trainer_window.show()                            
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)
