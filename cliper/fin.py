@@ -4,15 +4,29 @@ from .vinloader import VideoLoader
 from .audioanalyzer import AudioAnalyzer
 from .epicdetector import EpicDetector
 
+import glob
+import joblib
+
+def _get_mlmodel():
+    model_files = sorted(glob.glob("model_output/epic_model_*.pkl"))
+
+    if not model_files:
+        return None
+
+    latest_model_path = model_files[-1]
+    model = joblib.load(latest_model_path)
+    print(f"MODELMODELMODELMODEL{latest_model_path}")
+    return model
 class ClipP:
 
     def __init__(self, video_path: str, music_path: str):
         self.video_path = video_path
         self.music_path = music_path
+        self.model = _get_mlmodel()
 
         self.loader = VideoLoader(video_path)
         self.audio = AudioAnalyzer(video_path, music_path)
-        self.detector = EpicDetector(self.loader, self.audio)
+        self.detector = EpicDetector(self.loader, self.audio, self.model)
 
     def run(
         self,
@@ -68,3 +82,4 @@ class ClipP:
             )
 
         return float(result.stdout.strip())
+    
