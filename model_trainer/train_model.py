@@ -34,5 +34,7 @@ class ModelTrainer:
     def save(self, path: str) -> None:
         joblib.dump(self.model, path)
 
-    def load(self, path: str) -> None:
-        self.model = joblib.load(path)
+    def load(self, model) -> None:
+        if isinstance(model, LogisticRegression):
+            self.model = model
+

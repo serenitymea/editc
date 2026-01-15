@@ -42,7 +42,6 @@ class FineTuneController:
         )
         
         self.dataset = DatasetBuilder()
-        self.original_model_path = Path(self.model_path)
         
         self.output_dir = Path(output_path)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -87,11 +86,10 @@ class FineTuneController:
         self.trainer.train(X, y)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_path = self.output_dir / f"epic_model_finetuned_{timestamp}.pkl"
+        model_path = self.output_dir / f"epic_model_{timestamp}.pkl"
 
         self.trainer.save(model_path)
 
         self.widget.close()
 
         print(f"tuned model saved: {model_path}")
-        print(f"original model: {self.original_model_path}")

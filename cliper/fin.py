@@ -22,6 +22,7 @@ class ClipP:
     def __init__(self, video_path: str, music_path: str):
         self.video_path = video_path
         self.music_path = music_path
+        
         self.model = _get_mlmodel()
 
         self.loader = VideoLoader(video_path)

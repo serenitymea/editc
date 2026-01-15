@@ -19,6 +19,7 @@ class MainWindow(QWidget):
         self.setWindowTitle("Video Editor Panel")        
         
         self.labeling_controller: LabelingController | None = None
+        self.tune_controller: FineTuneController | None = None
         self.tuner: LabelingController | None = None
         self.trainer_window: QMainWindow | None = None
         self.tester: LiveFXTester | None = None
@@ -226,8 +227,10 @@ class MainWindow(QWidget):
             self.trainer_window.show()
 
             self.labeling_controller.start()
+            
+            
         elif msg.clickedButton() == continue_btn:
-            self.tuner = FineTuneController(
+            self.tune_controller = FineTuneController(
                 video_path=str(merged_video_path),
                 music_path=str(audio_path),
                 output_path="model_output"
@@ -235,10 +238,12 @@ class MainWindow(QWidget):
             
             self.trainer_window = QMainWindow(self)
             self.trainer_window.setCentralWidget(
-                self.labeling_controller.widget_view()
+                self.tune_controller.widget_view()
             )
             self.trainer_window.resize(1280, 720)
-            self.trainer_window.show()                            
+            self.trainer_window.show()   
+            
+            self.tune_controller.start()                         
         
 if __name__ == "__main__":
     app = QApplication(sys.argv)
