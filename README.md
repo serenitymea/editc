@@ -2,6 +2,8 @@
 
 An intelligent video editing system that automatically creates music-synchronized video edits with AI-powered clip selection and customizable visual effects.
 
+<img width="1919" height="1047" alt="Screenshot_1" src="https://github.com/user-attachments/assets/af08b174-56e6-45c4-86f9-be31f1b87e0f" />
+
 ## Features
 
 ### Core Capabilities
