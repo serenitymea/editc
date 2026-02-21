@@ -34,12 +34,12 @@ def compute_motion_score(mag):
 
 
 @numba.jit(nopython=True, cache=True, fastmath=True)
-def compute_overlap_penalty(start, end, clip_starts, clip_ends, clip_frames):
+def compute_overlap_penalty(start, end, clip_starts, clip_ends, clip_frames, decay_ratio):
     penalty = 1.0
     for i in range(len(clip_starts)):
         overlap = max(0, min(end, clip_ends[i]) - max(start, clip_starts[i]))
         if overlap > 0:
-            penalty *= np.exp(-overlap / (0.3 * clip_frames))
+            penalty *= np.exp(-overlap / (decay_ratio * clip_frames))
     return penalty
 
 
@@ -53,11 +53,13 @@ def compute_heuristic(segment):
 
 
 class VisualFeatureExtractor:
-    """OPTIMIZED: Extract visual features with minimal overhead"""
-    
-    def __init__(self, enable_face_detection=True):
+
+    def __init__(self, config):
+
+        self.config = config
         self.use_face_detection = False
-        if enable_face_detection:
+        
+        if self.config["face_detection"]["enabled"]:
             try:
                 self.face_cascade = cv2.CascadeClassifier(
                     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -67,12 +69,13 @@ class VisualFeatureExtractor:
                 pass
     
     def extract(self, frame) -> dict:
-        """extraction"""
 
         h, w = frame.shape[:2]
-        if h > 360:
-            scale = 360 / h
-            frame = cv2.resize(frame, (int(w * scale), 360))
+        resize_height = self.config["video_processing"]["resize_height"]
+        
+        if h > resize_height:
+            scale = resize_height / h
+            frame = cv2.resize(frame, (int(w * scale), resize_height))
         
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -91,7 +94,10 @@ class VisualFeatureExtractor:
         face_present = 0.0
         face_size_ratio = 0.0
         if self.use_face_detection:
-            faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
+            scale_factor = self.config["face_detection"]["scale_factor"]
+            min_neighbors = self.config["face_detection"]["min_neighbors"]
+            
+            faces = self.face_cascade.detectMultiScale(gray, scale_factor, min_neighbors)
             if len(faces) > 0:
                 face_present = 1.0
                 largest_face = max(faces, key=lambda f: f[2] * f[3])
@@ -118,15 +124,17 @@ class VisualFeatureExtractor:
     @staticmethod
     @numba.jit(nopython=True, cache=True, fastmath=True)
     def _compute_symmetry_numba(left, right):
-        """Numba-optimized symmetry computation"""
+
         diff = np.abs(left.astype(np.float32) - right.astype(np.float32)).mean()
         return max(0.0, 1.0 - diff / 255.0)
     
     def _compute_symmetry_fast(self, gray):
-        """FAST symmetry - downsampled"""
+
         h, w = gray.shape
-        if w > 100:
-            gray = cv2.resize(gray, (100, int(100 * h / w)))
+        symmetry_max_width = self.config["video_processing"]["symmetry_max_width"]
+        
+        if w > symmetry_max_width:
+            gray = cv2.resize(gray, (symmetry_max_width, int(symmetry_max_width * h / w)))
             h, w = gray.shape
         
         left = gray[:, :w//2]
@@ -140,23 +148,25 @@ class VisualFeatureExtractor:
 
 
 class TrainingDetector:
-    MOTION_WEIGHT = 0.40
-    AUDIO_WEIGHT = 0.35
-    VISUAL_WEIGHT = 0.10
-    CONTEXT_WEIGHT = 0.15
     SMOOTH_SIGMA = 1.5
 
-    def __init__(self, loader, audio_analyzer, model=None, enable_face_detection=False, audio_loops: int = 1):
+    def __init__(self, config, loader, audio_analyzer, model=None, audio_loops: Optional[int] = None):
+
+        self.config = config
         self.loader = loader
         self.audio = audio_analyzer
+        
+        if audio_loops is None:
+            audio_loops = self.config["audio_loops"]["default"]
         self.audio_loops = max(1, audio_loops)
+        
         self.cap = loader.cap
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.frames_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.duration = self.frames_count / self.fps
         self.model = model
 
-        self.visual_extractor = VisualFeatureExtractor(enable_face_detection)
+        self.visual_extractor = VisualFeatureExtractor(config)
         
         self.use_ml = model is not None
         self.heuristic_weight = 0.0 if self.use_ml else 1.0
@@ -196,7 +206,7 @@ class TrainingDetector:
         return result
 
     def _compute_all_features_optimized(self):
-        """Faster feature computation"""
+
         print(" [TD]computing features...")
         
         motion_scores = np.zeros(self.frames_count, dtype=np.float32)
@@ -204,8 +214,8 @@ class TrainingDetector:
         
         prev_gray = None
 
-        FLOW_STEP = max(1, int(self.fps / 10))
-        VISUAL_STEP = max(1, int(self.fps / 5))
+        flow_step = max(1, int(self.fps / self.config["windows"]["flow_sample_fps_divider"]))
+        visual_step = max(1, int(self.fps / self.config["windows"]["visual_sample_fps_divider"]))
 
         for i, frame in self.loader.frames():
             if i >= self.frames_count:
@@ -214,22 +224,28 @@ class TrainingDetector:
             if i % 1000 == 0:
                 print(f" [TD]prog: {i}/{self.frames_count} frames", end='\r')
 
-            if i % FLOW_STEP == 0:
-
-                gray = cv2.cvtColor(cv2.resize(frame, (256, 144)), cv2.COLOR_BGR2GRAY)
+            if i % flow_step == 0:
+                flow_res = self.config["video_processing"]["flow_resolution"]
+                gray = cv2.cvtColor(cv2.resize(frame, tuple(flow_res)), cv2.COLOR_BGR2GRAY)
                 
                 if prev_gray is not None:
-
+                    opt_flow_params = self.config["optical_flow"]
                     flow = cv2.calcOpticalFlowFarneback(
                         prev_gray, gray, None, 
-                        0.5, 2, 10, 2, 5, 1.1, 0
+                        opt_flow_params["pyr_scale"],
+                        opt_flow_params["levels"],
+                        opt_flow_params["winsize"],
+                        opt_flow_params["iterations"],
+                        opt_flow_params["poly_n"],
+                        opt_flow_params["poly_sigma"],
+                        opt_flow_params["flags"]
                     )
                     mag = np.linalg.norm(flow, axis=2)
                     motion_scores[i] = compute_motion_score(mag)
                 
                 prev_gray = gray
 
-            if i % VISUAL_STEP == 0:
+            if i % visual_step == 0:
                 vis_feat = self.visual_extractor.extract(frame)
                 visual_features.append((i, vis_feat))
 
@@ -243,22 +259,51 @@ class TrainingDetector:
                 motion_scores[non_zero]
             )
         
-        motion_scores = gaussian_filter1d(motion_scores, sigma=self.SMOOTH_SIGMA)
+        motion_scores = gaussian_filter1d(motion_scores, self.SMOOTH_SIGMA)
+        
+        if motion_scores.max() > 0:
+            motion_scores /= motion_scores.max()
 
-        all_features = []
-        for idx in range(self.frames_count):
-            
-            audio_feat = self.audio.get_advanced_audio_features(idx, self.frames_count)
-            motion_feat = self._extract_motion_features_fast(idx, motion_scores)
-            visual_feat = self._get_closest_visual_features(idx, visual_features)
-            context_feat = self._extract_temporal_context_fast(idx, motion_scores, audio_feat)
-            
-            combined = {**motion_feat, **audio_feat, **visual_feat, **context_feat}
-            all_features.append(combined)
-
+        print(" [TD]building feature vectors...")
+        all_features = self._build_feature_vectors_fast(
+            motion_scores, visual_features
+        )
+        
         return all_features
     
-    def _get_closest_visual_features(self, frame_idx, visual_features):
+    def _build_feature_vectors_fast(self, motion_scores, visual_features):
+
+        all_features = []
+
+        audio_features_cache = {}
+        
+        for frame_idx in range(self.frames_count):
+
+            vis_feat = self._get_visual_features_at_frame(frame_idx, visual_features)
+
+            if frame_idx not in audio_features_cache:
+                audio_feat = self.audio.get_advanced_audio_features(frame_idx, self.frames_count)
+                audio_features_cache[frame_idx] = audio_feat
+            else:
+                audio_feat = audio_features_cache[frame_idx]
+
+            motion_feat = self._extract_motion_features_fast(frame_idx, motion_scores)
+
+            context_feat = self._extract_temporal_context_fast(frame_idx, motion_scores, audio_feat)
+            
+            combined = {
+                **motion_feat,
+                **audio_feat,
+                **vis_feat,
+                **context_feat,
+            }
+            
+            all_features.append(combined)
+        
+        return all_features
+    
+    def _get_visual_features_at_frame(self, frame_idx, visual_features):
+
         if not visual_features:
             return self._empty_visual_features()
 
@@ -281,8 +326,8 @@ class TrainingDetector:
         }
     
     def _extract_motion_features_fast(self, idx, motion_scores):
-        """FAST motion feature extraction with numpy slicing"""
-        window_size = int(self.fps * 2)
+
+        window_size = int(self.fps * self.config["windows"]["motion_window_seconds"])
         start = max(0, idx - window_size)
         end = min(len(motion_scores), idx + window_size)
         
@@ -303,8 +348,8 @@ class TrainingDetector:
         }
     
     def _extract_temporal_context_fast(self, idx, motion_scores, audio_feat):
-        """temporal context"""
-        window = 5
+
+        window = self.config["windows"]["temporal_window_frames"]
         start = max(0, idx - window)
         end = min(len(motion_scores), idx + window)
         
@@ -359,7 +404,7 @@ class TrainingDetector:
         best_start = 0
         best_features = None
 
-        step = max(1, int(self.fps * 0.3))
+        step = max(1, int(self.fps * self.config["windows"]["clip_search_step_seconds"]))
 
         clip_starts = np.array([c.start_frame for c in excluded_clips], dtype=np.int32)
         clip_ends = np.array([c.end_frame for c in excluded_clips], dtype=np.int32)
@@ -381,8 +426,9 @@ class TrainingDetector:
             else:
                 score = self._heuristic_score(segment_features)
 
+            decay_ratio = self.config["clip_selection"]["overlap_decay_ratio"]
             overlap_penalty = compute_overlap_penalty(
-                start_frame, end_frame, clip_starts, clip_ends, clip_frames
+                start_frame, end_frame, clip_starts, clip_ends, clip_frames, decay_ratio
             )
             score *= overlap_penalty
 
@@ -404,7 +450,7 @@ class TrainingDetector:
         )
     
     def _aggregate_segment_features_fast(self, all_features, start, end):
-        """aggregation using numpy"""
+
         segment = all_features[start:end]
         
         if not segment:
@@ -435,35 +481,23 @@ class TrainingDetector:
             return self._heuristic_score(features)
     
     def _heuristic_score(self, features):
-        """FAST heuristic - minimal operations"""
+
+        weights = self.config["scoring"]["heuristic_weights"]
+        
         score = (
-            0.25 * features.get("motion_p90", 0) +
-            0.15 * features.get("motion_peak_ratio", 0) * 0.1 +
-            0.15 * features.get("beat_alignment_score", 0) +
-            0.15 * features.get("bass_energy", 0) +
-            0.10 * (1 - features.get("blur_score", 0.5)) +
-            0.10 * features.get("combined_buildup", 0) +
-            0.10 * features.get("rms_peak", 0)
+            weights["motion_p90"] * features.get("motion_p90", 0) +
+            weights["motion_peak_ratio"] * features.get("motion_peak_ratio", 0) * 0.1 +
+            weights["beat_alignment"] * features.get("beat_alignment_score", 0) +
+            weights["bass_energy"] * features.get("bass_energy", 0) +
+            weights["blur_inverse"] * (1 - features.get("blur_score", 0.5)) +
+            weights["buildup"] * features.get("combined_buildup", 0) +
+            weights["rms_peak"] * features.get("rms_peak", 0)
         )
         
         return float(max(0, min(1, score)))
     
     def _features_to_vector(self, features):
-        feature_order = [
-            "motion_mean", "motion_max", "motion_p90", "motion_std", "motion_peak_ratio",
-            "rms_mean", "rms_peak", "rms_contrast",
-            "spectral_centroid", "spectral_rolloff", "mfcc_variance",
-            "bass_energy", "vocal_probability", "onset_density",
-            "beat_alignment_score",
-            "blur_score", "edge_density", "color_variance",
-            "avg_brightness", "contrast_mean",
-            "face_present", "face_size_ratio",
-            "symmetry", "rule_of_thirds", "text_presence",
-            "motion_momentum", "audio_momentum", "combined_buildup",
-            "relative_position", "motion_derivative",
-            "duration"
-        ]
-        
+        feature_order = self.config["ml"]["feature_order"]
         return [features.get(key, 0.0) for key in feature_order]
     
     def _compute_diversity_penalty(self, features, excluded_clips):

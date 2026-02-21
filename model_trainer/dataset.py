@@ -8,26 +8,24 @@ class DatasetBuilder:
         self.samples: List[Dict] = []
 
     def add_sample(self, features: Dict[str, float], label: int) -> None:
-        """Add a labeled sample to the dataset"""
+
         self.samples.append({
             "x": list(features.values()),
             "y": int(label)
         })
 
     def get_xy(self) -> Tuple[List[List[float]], List[int]]:
-        """Get features and labels as separate lists"""
+
         X = [s["x"] for s in self.samples]
         y = [s["y"] for s in self.samples]
         return X, y
 
     def save(self, path: str) -> None:
-        """Save dataset to JSON file"""
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.samples, f, indent=2)
         print(f"[Dataset] Saved {len(self.samples)} samples to {path}")
     
     def load(self, path: str) -> None:
-        """Load dataset from JSON file"""
         with open(path, "r", encoding="utf-8") as f:
             self.samples = json.load(f)
         print(f"[Dataset] Loaded {len(self.samples)} samples from {path}")
@@ -66,12 +64,7 @@ class DatasetBuilder:
         print(f"[Dataset] Added {len(hard_negatives)} hard negatives")
     
     def generate_easy_negatives(self, all_features, count=None) -> None:
-        """
-        Generate easy negative examples:
-        1. Low motion + low audio
-        2. High blur (out of focus)
-        3. Random low-scoring segments
-        """
+
         print(f"[Dataset] Generating easy negatives...")
         
         if count is None:
@@ -101,7 +94,7 @@ class DatasetBuilder:
         print(f"[Dataset] Added {len(easy_negatives[:count])} easy negatives")
     
     def _aggregate_features(self, all_features, start_frame, end_frame):
-        """Aggregate features over a frame range"""
+
         segment = all_features[start_frame:end_frame]
         
         if not segment:
@@ -115,7 +108,7 @@ class DatasetBuilder:
         return aggregated
     
     def _truncate_peak(self, clip, all_features):
-        """Create a negative by cutting off the peak of a good clip"""
+
         if not clip.features:
             return None
 
@@ -130,12 +123,7 @@ class DatasetBuilder:
         return self._aggregate_features(all_features, clip.start_frame, new_end)
     
     def balance_dataset(self, target_ratio=1.0) -> None:
-        """
-        Balance positive and negative samples.
-        
-        Args:
-            target_ratio: Desired ratio of negatives to positives (1.0 = equal)
-        """
+
         X, y = self.get_xy()
         y = np.array(y)
         
@@ -187,7 +175,7 @@ class DatasetBuilder:
         return (X_train, y_train), (X_val, y_val)
     
     def get_statistics(self) -> Dict:
-        """Get dataset statistics"""
+        
         X, y = self.get_xy()
         y = np.array(y)
         

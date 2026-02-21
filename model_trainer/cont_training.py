@@ -5,6 +5,7 @@ from cliper import VideoLoader, AudioAnalyzer
 from .training_detector import TrainingDetector
 from pathlib import Path
 from datetime import datetime
+from tools.config_loader import load_default_config
 
 import glob
 import joblib
@@ -26,6 +27,8 @@ class FineTuneController:
 
         super().__init__()
         
+        self.config = load_default_config()
+        
         self.model_path = _get_mlmodel()
         
         if self.model_path is None:
@@ -43,10 +46,10 @@ class FineTuneController:
             print("[FTC] No model to fine-tune, will train new one")
 
         self.detector = TrainingDetector(
+            self.config,
             self.loader, 
             self.audioanalyzer, 
-            model=self.trainer.model, 
-            audio_loops=1
+            model=self.trainer.model
         )
         
         self.dataset = DatasetBuilder()
@@ -136,5 +139,5 @@ class FineTuneController:
 
         self.widget.close()
 
-        print(f"\n[FTC] ✓ Fine-tuned model saved: {model_path}")
-        print(f"[FTC] ✓ Dataset saved: {dataset_path}")
+        print(f"\n[FTC] Fine-tuned model saved: {model_path}")
+        print(f"[FTC] Dataset saved: {dataset_path}")

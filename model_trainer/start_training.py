@@ -5,19 +5,21 @@ from cliper import VideoLoader, AudioAnalyzer
 from .training_detector import TrainingDetector
 from pathlib import Path
 from datetime import datetime
+from tools.config_loader import load_default_config
 
 class LabelingController:
 
     def __init__(self, video_path: str, music_path: str, output_path: str):
         super().__init__()
         
+        self.config = load_default_config()
         self.loader = VideoLoader(video_path)
         self.audioanalyzer = AudioAnalyzer(video_path, music_path)
         self.detector = TrainingDetector(
+            self.config,
             self.loader, 
             self.audioanalyzer, 
             model=None, 
-            audio_loops=1
         )
         self.dataset = DatasetBuilder()
         self.trainer = ModelTrainer(use_catboost=True)
@@ -107,5 +109,5 @@ class LabelingController:
 
         self.widget.close()
 
-        print(f"\n[LC] ✓ Model saved: {model_path}")
-        print(f"[LC] ✓ Dataset saved: {dataset_path}")
+        print(f"\n[LC] Model saved: {model_path}")
+        print(f"[LC] Dataset saved: {dataset_path}")

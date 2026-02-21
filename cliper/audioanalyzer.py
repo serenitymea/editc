@@ -72,7 +72,7 @@ class AudioAnalyzer:
             raise RuntimeError("ffmpeg audio extraction failed")
 
     def _precompute_advanced_features(self):
-        """Precompute spectral and rhythm features"""
+
         print("   [AA]computing advanced features...")
 
         hop_length = 1024
@@ -104,7 +104,7 @@ class AudioAnalyzer:
         print("   [AA]advanced features ready")
 
     def _compute_harmonicity_fast(self):
-        """harmonicity measure - simplified version"""
+
         hop_length = 1024
 
         spectral_flatness = librosa.feature.spectral_flatness(
@@ -133,7 +133,7 @@ class AudioAnalyzer:
         return float(self.rms[idx] / (self.rms.max() + 1e-6))
     
     def get_advanced_audio_features(self, frame_idx, total_frames) -> dict:
-        """Get all advanced audio features for a frame"""
+
         if total_frames <= 0:
             return self._empty_audio_features()
         
@@ -185,7 +185,7 @@ class AudioAnalyzer:
         }
     
     def get_beat_strength(self, frame_idx, total_frames) -> float:
-        """How close is this frame to a beat - OPTIMIZED"""
+
         if total_frames <= 0 or len(self.beat_times) == 0:
             return 0.0
         
@@ -199,7 +199,7 @@ class AudioAnalyzer:
     
     @lru_cache(maxsize=256)
     def get_beat_alignment_score(self, start_time_sec) -> float:
-        """How well aligned is this start time with a beat"""
+
         if len(self.beat_times) == 0:
             return 0.0
 

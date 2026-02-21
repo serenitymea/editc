@@ -3,12 +3,12 @@ from typing import List, Optional
 from .vinloader import VideoLoader
 from .audioanalyzer import AudioAnalyzer
 from .epicdetector import EpicDetector
+from tools import load_default_config
 
 import glob
 import joblib
 
 def _get_mlmodel():
-    """Load the latest trained model"""
     model_files = sorted(glob.glob("model_output/epic_model_*.pkl"))
 
     if not model_files:
@@ -22,15 +22,9 @@ def _get_mlmodel():
 
 
 class ClipP:
-    """
-    Main clip detection pipeline with ML integration.
-    
-    Usage:
-        processor = ClipP(video_path, music_path)
-        clips = processor.run(max_clips=10)
-    """
 
     def __init__(self, video_path: str, music_path: str):
+        self.config = load_default_config()
         self.video_path = video_path
         self.music_path = music_path
         
@@ -40,7 +34,7 @@ class ClipP:
 
         self.loader = VideoLoader(video_path)
         self.audio = AudioAnalyzer(video_path, music_path)
-        self.detector = EpicDetector(self.loader, self.audio, self.model)
+        self.detector = EpicDetector(self.config, self.loader, self.audio, self.model)
         
         print("[ClipP] Ready to detect clips")
 
@@ -49,18 +43,6 @@ class ClipP:
         target_duration: Optional[float] = None,
         max_clips: Optional[int] = None,
     ) -> List:
-        """
-        Detect epic clips from the video.
-        
-        Args:
-            target_duration: Total duration of clips to generate (in seconds)
-                           If None, uses the full music duration
-            max_clips: Maximum number of clips to return
-                      If None, determined by target_duration and beat intervals
-        
-        Returns:
-            List of Clip objects with start_frame, end_frame, score, and features
-        """
 
         if target_duration is None:
             target_duration = self._get_audio_duration()
@@ -80,7 +62,7 @@ class ClipP:
 
             clips = self.detector.detect_perfect_clips(max_clips=max_clips)
 
-            print(f"\n[ClipP] ✓ Found {len(clips)} clips")
+            print(f"\n[ClipP] Found {len(clips)} clips")
             if clips:
                 total = sum(c.duration for c in clips)
                 avg_score = sum(c.score for c in clips) / len(clips)
@@ -98,7 +80,7 @@ class ClipP:
             self.loader.release()
 
     def _get_audio_duration(self) -> float:
-        """Get the duration of the music file using ffprobe"""
+
         result = subprocess.run(
             [
                 "ffprobe",
@@ -121,13 +103,7 @@ class ClipP:
         return float(result.stdout.strip())
     
     def export_clips_info(self, clips: List, output_path: str = "clips_info.json"):
-        """
-        Export clip information to JSON for external use.
-        
-        Args:
-            clips: List of Clip objects
-            output_path: Path to save JSON file
-        """
+
         import json
         
         clips_data = []
@@ -161,12 +137,7 @@ class ClipP:
         print(f"[ClipP] Exported clip info to {output_path}")
     
     def get_feature_importance(self):
-        """
-        Get feature importance from the ML model if available.
-        
-        Returns:
-            Dict mapping feature names to importance scores, or None
-        """
+
         if self.model is None:
             print("[ClipP] No ML model loaded")
             return None
@@ -192,7 +163,6 @@ class ClipP:
         return None
     
     def _get_feature_names(self):
-        """Standard feature names in order"""
         return [
             "motion_mean", "motion_max", "motion_p90", "motion_std", "motion_peak_ratio",
             "rms_mean", "rms_peak", "rms_contrast",

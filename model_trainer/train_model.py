@@ -13,10 +13,6 @@ from sklearn.linear_model import LogisticRegression
 
 
 class ModelTrainer:
-    """
-    Trains a binary classifier from feature vectors.
-    Uses CatBoost if available, otherwise LogisticRegression.
-    """
 
     def __init__(self, use_catboost=True):
         self.use_catboost = use_catboost and CATBOOST_AVAILABLE
@@ -88,22 +84,18 @@ class ModelTrainer:
         self._print_feature_importance()
 
     def predict_proba(self, X):
-        """Predict class probabilities"""
         X = np.asarray(X, dtype=np.float32)
         return self.model.predict_proba(X)
     
     def predict(self, X):
-        """Predict class labels"""
         X = np.asarray(X, dtype=np.float32)
         return self.model.predict(X)
 
     def save(self, path: str) -> None:
-        """Save model to disk"""
         joblib.dump(self.model, path)
         print(f"[ModelTrainer] Model saved to {path}")
 
     def load(self, model) -> None:
-        """Load model from disk or object"""
         if isinstance(model, str):
 
             self.model = joblib.load(model)
@@ -116,7 +108,7 @@ class ModelTrainer:
             print(f"[WARN] Invalid model type: {type(model)}")
     
     def _print_feature_importance(self):
-        """Print top feature importances if available"""
+
         try:
             if self.use_catboost:
                 importance = self.model.get_feature_importance()
