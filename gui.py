@@ -9,7 +9,7 @@ import shutil
 
 from videoeffects import GlitchVideoFX
 from editor import VideoPipeline
-from tools import VideoMerger, LiveFXTester, AddAudio
+from tools import VideoMerger, LiveFXTester, AddAudio, PromptConfigGenerator
 from model_trainer import LabelingController, FineTuneController
 
 
@@ -47,6 +47,10 @@ class MainWindow(QWidget):
         QMessageBox.information(self, "Info", text)
 
     def run_pipeline(self):
+        
+        PromptConfigGenerator().generate(
+            "Эдит по аниме дневник смерти с яндере юки, лови больше моментов где юки красуеться смееться и с самой юки избегай унылых домов бери более эпические моменты"
+        )
         
         audio_files, _ = QFileDialog.getOpenFileNames(
             self,
@@ -158,6 +162,10 @@ class MainWindow(QWidget):
         self.notify("Glitch ready")
     
     def run_trainer(self):
+        
+        PromptConfigGenerator().generate(
+            "cinematic anime battle montage with heavy bass drops"
+        )
         
         audio_files, _ = QFileDialog.getOpenFileNames(
             self,
