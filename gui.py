@@ -164,7 +164,15 @@ class MainWindow(QWidget):
     def run_trainer(self):
         
         PromptConfigGenerator().generate(
-            "cinematic anime battle montage with heavy bass drops"
+            """anime psychological thriller, first episode introduction
+        Motion: low to medium motion, sudden spikes of chaos, unstable dynamics
+        Music: dark ambient, psychological tension, subtle bass pulses, dramatic build-up
+        Editing: slow pacing with sudden sharp cuts, suspenseful transitions
+        Visual style: dark color palette, neon city lights, high contrast shadows, glitch elements
+        Mood: paranoid, tense, mysterious, disturbing
+        People/faces: main character focus, emotional facial expressions, isolation feeling
+        Camera: cinematic framing, slow zooms, unstable handheld moments
+        Narrative context: reality distortion, future prediction, psychological breakdown, fate theme"""
         )
         
         audio_files, _ = QFileDialog.getOpenFileNames(
